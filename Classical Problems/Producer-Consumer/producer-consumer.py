@@ -18,7 +18,7 @@ def Producer(id):
     # event = waitForEvent()
     # buffer.add(event)
     print(f"producer {id} starts")
-    for _ in range(num_consumers): # wastefully large right now
+    for _ in range((num_consumers//3)+1): # wastefully large right now, maybe only produce when it becomes empty?
         added = random.randint(0,1)
         with buffer_lock:
             print(f"producer {id} adds {added} to the buffer")

@@ -5,61 +5,70 @@ use std::sync::Mutex;
 use std::sync::MutexGuard;
 use std::sync::Arc;
 
-const NUM_PRODUCERS: i32 = 1;
-const NUM_CONSUMERS: i32 = 10;
+const NUM_PRODUCERS: i32 = 3;
+const NUM_CONSUMERS: i32 = 100;
 
 fn main() {
     // Track number of threads
     let mut threads = vec![];
 
-    // Need a shared buffer
-    let buffer = Arc::new(Mutex::new(vec![0]));
-
-    // Item production condition variable
-    let item_produced = Arc::new(Condvar::new());
+    let triple = Arc::new((Mutex::new(false), Mutex::new(vec![0]), Condvar::new()));
 
     for i in 0..NUM_CONSUMERS {
-        let cloned_buffer = buffer.clone();
-        let cloned_item_produced = item_produced.clone();
+        let c_triple = Arc::clone(&triple);
         // Consumers spawner
         threads.push(thread::spawn(move || {
             // Consumer code
             println!("consumer {} starts", i);
-            
-            // Lock buffer and wait until consumable
-            let buff_guard = cloned_buffer.lock().unwrap();
-            // How do I actually surround this with a loop because of all these unwraps?
-            //while buff_guard.len() == 0 { // <-- does not work
-            let item = cloned_item_produced.wait(buff_guard).unwrap().pop();
-            println!("consumer {} is done waiting, read {:?}",i,item);
-            //}
 
+            let (buff_empty_lock, buff_lock, item_produced) = &*c_triple;
+
+            let mut buff_empty = buff_empty_lock.lock().unwrap();
+
+            while *buff_empty { 
+                println!("consumer {} waits for buffer to not be empty",i);
+                buff_empty = item_produced.wait(buff_empty).unwrap();
+            }
+
+            // Now we should know the buffer is NOT empty
+
+            // Consume and print
+            let item = buff_lock.lock().unwrap().pop();
+            *buff_empty = buff_lock.lock().unwrap().len() == 0;
+
+            println!("consumer {} consumed {:?} from buffer",i,item);
 
             println!("consumer {} exits", i);
         }));
+
+        // thread::sleep(Duration::from_secs(1));
     }
 
     for j in 0..NUM_PRODUCERS {
-        let cloned_buffer = buffer.clone();
-        let cloned_item_produced = item_produced.clone();
+        let c_triple = Arc::clone(&triple);
         // Producer spawner
         threads.push(thread::spawn(move || {
             // Producer code
             println!("producer {} starts", j);
 
-            for _ in 0..NUM_CONSUMERS {
-                println!("producer {} relocks and adds to buffer",j);
+            let (buff_empty_lock, buff_lock, item_produced) = &*c_triple;
 
-                cloned_buffer.lock().unwrap().push(0);
-                // Unlock?
-                
+            let mut buff_empty = buff_empty_lock.lock().unwrap();
+
+            for _ in 0..NUM_CONSUMERS/NUM_PRODUCERS+1 {
+                // Wastefully large prodduction right now
+                println!("producer {} produces 0 to the buffer",j);
+                buff_lock.lock().unwrap().push(0);
+
+                *buff_empty = false;
                 println!("producer {} notifies all consumers",j);
-                // Notify thread that it can consume
-                cloned_item_produced.notify_all();
+                item_produced.notify_all();
             }
 
             println!("producer {} exits", j);
         }));
+
+        // thread::sleep(Duration::from_secs(1));
     }
 
     for t in threads {
