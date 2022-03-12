@@ -26,13 +26,21 @@ fn reader_spawner(data: Arc<Mutex<i32>>, inside_pair: Arc<(Mutex<i32>, Mutex<i32
             let (readers_inside_l, writers_inside_l) = &*c_inside;
             let (reader_can_enter, writer_can_enter) = &*c_condvars;
             
+            println!("Reader {} attempts to lock reader_ok_l",i);
             let mut reader_ok = reader_ok_l.lock().unwrap();
+            println!("Reader {} successfully locked reader_ok_l",i);
 
             // Can enter if no writers are in the room
             while !*reader_ok {
                 println!("Reader {} should wait until all writers leave",i);
                 reader_ok = reader_can_enter.wait(reader_ok).unwrap();
             }  
+
+            println!("Reader {} attempts to lock writer_ok_l",i);
+            let mut writer_ok = writer_ok_l.lock().unwrap();
+            println!("Reader {} successfully locked writer_ok_l",i);
+            *writer_ok = false;
+
 
             println!("Reader {} enters safely",i);
 
@@ -48,7 +56,6 @@ fn reader_spawner(data: Arc<Mutex<i32>>, inside_pair: Arc<(Mutex<i32>, Mutex<i32
             *readers_inside -= 1;
 
             if *readers_inside == 0 {
-                let mut writer_ok = writer_ok_l.lock().unwrap();
                 *writer_ok = true;
                 writer_can_enter.notify_all();
             }
@@ -77,13 +84,20 @@ fn writer_spawner(data: Arc<Mutex<i32>>, inside_pair: Arc<(Mutex<i32>, Mutex<i32
             let (readers_inside_l, writers_inside_l) = &*c_inside;
             let (reader_can_enter, writer_can_enter) = &*c_condvars;
 
+            println!("Writer {} attempts to lock writer_ok_l",i);
             let mut writer_ok = writer_ok_l.lock().unwrap();
+            println!("Writer {} successfully locks writer_ok_l",i);
 
             while !*writer_ok {
                 println!("Writer {} should wait until the room is empty",i);
                 writer_ok = writer_can_enter.wait(writer_ok).unwrap();
             }
             // Cannot drop, another use of this later
+            *writer_ok = false;
+            println!("Writer {} attempts to lock reader_ok_l",i);
+            let mut reader_ok = reader_ok_l.lock().unwrap();
+            println!("Writer {} successfully locked reader_ok_l",i);
+            *reader_ok = false;
             
             let mut writers_inside = writers_inside_l.lock().unwrap();
             println!("Writer {} safely enters",i);
@@ -98,7 +112,6 @@ fn writer_spawner(data: Arc<Mutex<i32>>, inside_pair: Arc<(Mutex<i32>, Mutex<i32
             *writers_inside -= 1;
 
             if *writers_inside == 0 {
-                let mut reader_ok = reader_ok_l.lock().unwrap();
                 *reader_ok = true;
                 *writer_ok = true;
                 writer_can_enter.notify_all();
