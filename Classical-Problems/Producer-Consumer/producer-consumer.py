@@ -60,10 +60,6 @@ def Consumer(id):
 
 
 if __name__=="__main__":
-    # Threads must have exclusive access to buffer
-    # If a consumer arrives while the buffer is empty, it blocks until
-    # a producer has filled the thread
-    
     for i in range(num_consumers):
         ci = threading.Thread(target=Consumer, args=(i,))
         ci.start()
