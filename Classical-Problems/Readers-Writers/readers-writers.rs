@@ -27,23 +27,28 @@ fn reader_spawner(shared: Arc<Mutex<Shared>>, condvars: Arc<(Condvar,Condvar)>) 
 
             let (reader_can_enter, writer_can_enter) = &*c_condvars;
             // Effectively lock everything
-            let mut shared_guard = c_shared.lock().unwrap();
-
-            while (*shared_guard).writers_inside > 0 {
-                println!("Reader {} waits for a writer to leave",i);
-                shared_guard = reader_can_enter.wait(shared_guard).unwrap();
+            {
+                let mut shared_guard = c_shared.lock().unwrap();
+                while (*shared_guard).writers_inside > 0 {
+                    println!("Reader {} waits for a writer to leave",i);
+                    shared_guard = reader_can_enter.wait(shared_guard).unwrap();
+                }
             }
+            {
+                let mut shared_guard = c_shared.lock().unwrap();
+                println!("Reader {} enters the room",i);
+                (*shared_guard).readers_inside += 1;
 
-            println!("Reader {} enters the room",i);
-            (*shared_guard).readers_inside += 1;
+                println!("Reader {} reads {} from the shared data",i,(*shared_guard).data);
 
-            println!("Reader {} reads {} from the shared data",i,(*shared_guard).data);
-
-            println!("Reader {} leaves the room",i);
-            (*shared_guard).readers_inside -= 1;
-
-            if (*shared_guard).readers_inside == 0 {
-                writer_can_enter.notify_all();
+                println!("Reader {} leaves the room",i);
+                (*shared_guard).readers_inside -= 1;
+            }
+            {
+                let mut shared_guard = c_shared.lock().unwrap();
+                if (*shared_guard).readers_inside == 0 {
+                    writer_can_enter.notify_all();
+                }
             }
         }));
     }
@@ -64,24 +69,29 @@ fn writer_spawner(shared: Arc<Mutex<Shared>>, condvars: Arc<(Condvar,Condvar)>) 
             println!("Writer {} arrives",i);
 
             let (reader_can_enter, writer_can_enter) = &*c_condvars;
-            let mut shared_guard = c_shared.lock().unwrap();
-
-            while (*shared_guard).writers_inside > 0 || (*shared_guard).readers_inside > 0 {
-                println!("Writer {} waits until the room empties",i);
-                shared_guard = writer_can_enter.wait(shared_guard).unwrap();
+            {
+                let mut shared_guard = c_shared.lock().unwrap();
+                while (*shared_guard).writers_inside > 0 || (*shared_guard).readers_inside > 0 {
+                    println!("Writer {} waits until the room empties",i);
+                    shared_guard = writer_can_enter.wait(shared_guard).unwrap();
+                }
             }
+            {
+                let mut shared_guard = c_shared.lock().unwrap();
+                println!("Writer {} entered the room",i);
+                (*shared_guard).writers_inside += 1;
 
-            println!("Writer {} entered the room",i);
-            (*shared_guard).writers_inside += 1;
+                (*shared_guard).data += 1;
+                println!("Writer {} writes {} to shared data",i,(*shared_guard).data);
 
-            (*shared_guard).data += 1;
-            println!("Writer {} writes {} to shared data",i,(*shared_guard).data);
-
-            println!("Writer {} leaves the room",i);
-            (*shared_guard).writers_inside -= 1;
-
-            writer_can_enter.notify_all();
-            reader_can_enter.notify_all();
+                println!("Writer {} leaves the room",i);
+                (*shared_guard).writers_inside -= 1;
+            }
+            {
+                let mut shared_guard = c_shared.lock().unwrap();
+                writer_can_enter.notify_all();
+                reader_can_enter.notify_all();
+            }
         }));    
     }
 
