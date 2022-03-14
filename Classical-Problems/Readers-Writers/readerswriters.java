@@ -24,6 +24,7 @@ public class readerswriters {
             synchronized (lock) {
                 while (writersInside > 0) {
                     try {
+                        System.err.printf("Reader %d waits to enter\n",id);
                         readerCanEnter.wait();
                     } catch (InterruptedException iex) {
                         System.err.printf("Reader %d interrupted in wait call\nStacktrace:",id);
@@ -42,9 +43,12 @@ public class readerswriters {
                 readersInside--;
 
                 if(readersInside == 0) {
+                    System.err.printf("Reader %d notifies all writers to enter\n",id);
                     writerCanEnter.notifyAll();
                 }
             }
+
+            System.err.printf("Reader %d thread exits\n",id);
         }
     }
 
@@ -57,6 +61,35 @@ public class readerswriters {
         
         public void run() {
             System.err.printf("Writer %d arrives\n",id);
+
+            synchronized (lock) {
+                while ( writersInside > 0 || readersInside > 0 ) {
+                    try {
+                        System.err.printf("Writer %d waits to enter\n",id);
+                        writerCanEnter.wait();
+                    } catch (InterruptedException iex) {
+                        System.err.printf("Writer %d interrupted in wait call\nStacktrace:",id);
+                        iex.printStackTrace();
+                    }
+                }
+
+                System.err.printf("Writer %d enters the room\n",id);
+                writersInside++;
+            }
+            // Break to allow interrupts
+            synchronized (lock) {
+                data = Integer.valueOf(data.intValue()+1);
+                System.err.printf("Writer %d writes %d to shared data\n",id,data.intValue());
+
+                System.err.printf("Writer %d leaves the room\n",id);
+                writersInside--;
+
+                System.err.printf("Writer %d notifies all threads to enter\n",id);
+                writerCanEnter.notifyAll();
+                readerCanEnter.notifyAll();
+            }
+
+            System.err.printf("Writer %d thread exits\n",id);
         }
     }
 
