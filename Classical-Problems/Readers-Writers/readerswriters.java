@@ -134,6 +134,8 @@ public class readerswriters {
     }
 
     public readerswriters(int readers, int writers){
+        // Use futures instead:
+        // https://stackoverflow.com/questions/20495414/thread-join-equivalent-in-executor
         data = Integer.valueOf(0);
         lock = new ReentrantLock();
         writerCanEnter = lock.newCondition();
