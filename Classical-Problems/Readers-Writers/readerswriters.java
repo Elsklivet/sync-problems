@@ -1,7 +1,16 @@
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class readerswriters {
+
+    private static ReentrantLock lock;
+    private static Condition writerCanEnter; 
+    private static Condition readerCanEnter;
+    private static int writersInside;
+    private static int readersInside;
+    private static Integer data;
 
     public class Reader implements Runnable {
         private int id;
@@ -12,6 +21,30 @@ public class readerswriters {
 
         public void run() {
             System.err.printf("Reader %d arrives\n",id);
+            synchronized (lock) {
+                while (writersInside > 0) {
+                    try {
+                        readerCanEnter.wait();
+                    } catch (InterruptedException iex) {
+                        System.err.printf("Reader %d interrupted in wait call\nStacktrace:",id);
+                        iex.printStackTrace();
+                    }
+                }
+                
+                System.err.printf("Reader %d enters the room\n",id);
+                readersInside++;
+            }
+            // Break so other readers can enter 
+            synchronized (lock) {
+                System.err.printf("Reader %d reads %d from the shared data\n",id,data.intValue());
+                
+                System.err.printf("Reader %d leaves the room\n",id);
+                readersInside--;
+
+                if(readersInside == 0) {
+                    writerCanEnter.notifyAll();
+                }
+            }
         }
     }
 
@@ -68,6 +101,10 @@ public class readerswriters {
     }
 
     public readerswriters(int readers, int writers){
+        data = Integer.valueOf(0);
+        lock = new ReentrantLock();
+        writerCanEnter = lock.newCondition();
+        readerCanEnter = lock.newCondition();
         ExecutorService spawnerPool = Executors.newFixedThreadPool(2);
 
         spawnerPool.submit(new ReaderSpawner(readers));
