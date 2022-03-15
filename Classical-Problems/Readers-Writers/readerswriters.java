@@ -22,17 +22,16 @@ public class readerswriters {
 
         public void run() {
             System.err.printf("Reader %d arrives\n",id);
-            synchronized (lock) {
                 while (writersInside > 0) {
                     try {
                         System.err.printf("Reader %d waits to enter\n",id);
-                        readerCanEnter.wait(60000L,0);
+                        synchronized(readerCanEnter){readerCanEnter.wait(2000L,0);}
                     } catch (InterruptedException iex) {
                         System.err.printf("Reader %d interrupted in wait call\nStacktrace:",id);
                         iex.printStackTrace();
                     }
                 }
-                
+            synchronized (lock) { 
                 System.err.printf("Reader %d enters the room\n",id);
                 readersInside++;
             }
@@ -45,7 +44,7 @@ public class readerswriters {
 
                 if(readersInside == 0) {
                     System.err.printf("Reader %d notifies all writers to enter\n",id);
-                    writerCanEnter.notifyAll();
+                    synchronized(writerCanEnter){writerCanEnter.notifyAll();}
                 }
             }
 
@@ -63,17 +62,16 @@ public class readerswriters {
         public void run() {
             System.err.printf("Writer %d arrives\n",id);
 
-            synchronized (lock) {
                 while ( writersInside > 0 || readersInside > 0 ) {
                     try {
                         System.err.printf("Writer %d waits to enter\n",id);
-                        writerCanEnter.wait(60000L,0);
+                        synchronized(writerCanEnter){writerCanEnter.wait(2000L,0);}
                     } catch (InterruptedException iex) {
                         System.err.printf("Writer %d interrupted in wait call\nStacktrace:",id);
                         iex.printStackTrace();
                     }
-                }
-
+            }
+            synchronized (lock){
                 System.err.printf("Writer %d enters the room\n",id);
                 writersInside++;
             }
@@ -86,8 +84,8 @@ public class readerswriters {
                 writersInside--;
 
                 System.err.printf("Writer %d notifies all threads to enter\n",id);
-                writerCanEnter.notifyAll();
-                readerCanEnter.notifyAll();
+                synchronized (writerCanEnter){writerCanEnter.notifyAll();}
+                synchronized (readerCanEnter){readerCanEnter.notifyAll();}
             }
 
             System.err.printf("Writer %d thread exits\n",id);
@@ -112,7 +110,7 @@ public class readerswriters {
             pool.shutdown();
 
             try {
-                if(!pool.awaitTermination(5L, TimeUnit.SECONDS)) {
+                if(!pool.awaitTermination(10L, TimeUnit.SECONDS)) {
                     System.err.println("Writers failed to exit on time.");
                 }
             } catch (InterruptedException iex) {
@@ -144,7 +142,7 @@ public class readerswriters {
             pool.shutdown();
 
             try {
-                if(!pool.awaitTermination(5L, TimeUnit.SECONDS)) {
+                if(!pool.awaitTermination(10L, TimeUnit.SECONDS)) {
                     System.err.println("Readers failed to exit on time.");
                 }
             } catch (InterruptedException iex) {
@@ -173,7 +171,7 @@ public class readerswriters {
         spawnerPool.shutdown();
 
         try {
-            if(!spawnerPool.awaitTermination(5L, TimeUnit.SECONDS)) {
+            if(!spawnerPool.awaitTermination(20L, TimeUnit.SECONDS)) {
                 System.err.println("Spawners failed to exit on time.");
             }
         } catch (InterruptedException iex) {
