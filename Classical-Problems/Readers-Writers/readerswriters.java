@@ -1,5 +1,6 @@
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -25,7 +26,7 @@ public class readerswriters {
                 while (writersInside > 0) {
                     try {
                         System.err.printf("Reader %d waits to enter\n",id);
-                        readerCanEnter.wait();
+                        readerCanEnter.wait(60000L,0);
                     } catch (InterruptedException iex) {
                         System.err.printf("Reader %d interrupted in wait call\nStacktrace:",id);
                         iex.printStackTrace();
@@ -66,7 +67,7 @@ public class readerswriters {
                 while ( writersInside > 0 || readersInside > 0 ) {
                     try {
                         System.err.printf("Writer %d waits to enter\n",id);
-                        writerCanEnter.wait();
+                        writerCanEnter.wait(60000L,0);
                     } catch (InterruptedException iex) {
                         System.err.printf("Writer %d interrupted in wait call\nStacktrace:",id);
                         iex.printStackTrace();
@@ -109,6 +110,18 @@ public class readerswriters {
             }
 
             pool.shutdown();
+
+            try {
+                if(!pool.awaitTermination(5L, TimeUnit.SECONDS)) {
+                    System.err.println("Writers failed to exit on time.");
+                }
+            } catch (InterruptedException iex) {
+                System.err.println("Exception caught waiting for writers to terminate.");
+                pool.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+
+            System.err.printf("Writer spawner termination status: %s\n", pool.isTerminated());
         }
 
     }
@@ -129,6 +142,18 @@ public class readerswriters {
             }
 
             pool.shutdown();
+
+            try {
+                if(!pool.awaitTermination(5L, TimeUnit.SECONDS)) {
+                    System.err.println("Readers failed to exit on time.");
+                }
+            } catch (InterruptedException iex) {
+                System.err.println("Exception caught waiting for readers to terminate.");
+                pool.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+
+            System.err.printf("Reader spawner termination status: %s\n", pool.isTerminated());
         }
 
     }
@@ -140,12 +165,24 @@ public class readerswriters {
         lock = new ReentrantLock();
         writerCanEnter = lock.newCondition();
         readerCanEnter = lock.newCondition();
-        ExecutorService spawnerPool = Executors.newFixedThreadPool(2);
+        ExecutorService spawnerPool = Executors.newCachedThreadPool();
 
         spawnerPool.submit(new ReaderSpawner(readers));
         spawnerPool.submit(new WriterSpawner(writers));
 
         spawnerPool.shutdown();
+
+        try {
+            if(!spawnerPool.awaitTermination(5L, TimeUnit.SECONDS)) {
+                System.err.println("Spawners failed to exit on time.");
+            }
+        } catch (InterruptedException iex) {
+            System.err.println("Exception caught waiting for spawners to terminate.");
+            spawnerPool.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+
+        System.err.printf("Spawner termination status: %s\n", spawnerPool.isTerminated());
     }
 
     public static void main(String[] args) {
