@@ -6,19 +6,16 @@ use std::sync::MutexGuard;
 use std::sync::Arc;
 use std::env;
 
-const NUM_READERS: i32 = 10;
-const NUM_WRITERS: i32 = 3;
-
 struct Shared {
     writers_inside: i32,
     readers_inside: i32,
     data: i32
 }
 
-fn reader_spawner(shared: Arc<Mutex<Shared>>, condvars: Arc<(Condvar,Condvar)>) {
+fn reader_spawner(shared: Arc<Mutex<Shared>>, condvars: Arc<(Condvar,Condvar)>, num_readers: i32) {
     let mut threads = vec![];
 
-    for i in 0..NUM_READERS {
+    for i in 0..num_readers {
         let c_shared = Arc::clone(&shared);
         let c_condvars = Arc::clone(&condvars);
         threads.push(thread::spawn(move || {
@@ -58,10 +55,10 @@ fn reader_spawner(shared: Arc<Mutex<Shared>>, condvars: Arc<(Condvar,Condvar)>) 
     }
 }
 
-fn writer_spawner(shared: Arc<Mutex<Shared>>, condvars: Arc<(Condvar,Condvar)>) {
+fn writer_spawner(shared: Arc<Mutex<Shared>>, condvars: Arc<(Condvar,Condvar)>, num_writers: i32) {
     let mut threads = vec![];
 
-    for i in 0..NUM_WRITERS {
+    for i in 0..num_writers {
         let c_shared = Arc::clone(&shared);
         let c_condvars = Arc::clone(&condvars);
         threads.push(thread::spawn(move || {
@@ -101,6 +98,14 @@ fn writer_spawner(shared: Arc<Mutex<Shared>>, condvars: Arc<(Condvar,Condvar)>) 
 }
 
 fn main() {
+    let args: Vec<String> = env::args().collect();
+    let mut num_readers = 10;
+    let mut num_writers = 2;
+    if args.len() >= 3 {
+        num_readers = (&args[1]).parse().unwrap();
+        num_writers = (&args[2]).parse().unwrap();
+    }
+
     let mut threads = vec![];
 
     let shared = Arc::new(Mutex::new(Shared {
@@ -115,13 +120,13 @@ fn main() {
     let c1_shared = Arc::clone(&shared);
     let c1_condvars = Arc::clone(&condvars);
     threads.push(thread::spawn(move || {
-        reader_spawner(c1_shared, c1_condvars);
+        reader_spawner(c1_shared, c1_condvars, num_readers);
     }));
 
     let c2_shared = Arc::clone(&shared);
     let c2_condvars = Arc::clone(&condvars);
     threads.push(thread::spawn(move || {
-        writer_spawner(c2_shared, c2_condvars);
+        writer_spawner(c2_shared, c2_condvars, num_writers);
     }));
 
     for t in threads {
