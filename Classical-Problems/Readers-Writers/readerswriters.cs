@@ -11,7 +11,9 @@ public class ReadersWritersClass {
     private int data = 0;
 
     // Time for sync primitives
-    
+    internal static Mutex mutex;
+    internal static AutoResetEvent writerCanEnter;
+    internal static AutoResetEvent readerCanEnter;
 
 
     public class Reader {
@@ -22,6 +24,10 @@ public class ReadersWritersClass {
 
         public void run() {
             Console.WriteLine($"Reader {id} arrives");
+
+            mutex.WaitOne();
+            // crit
+            mutex.ReleaseMutex();
         }
     }
 
@@ -77,6 +83,10 @@ public class ReadersWritersClass {
     }
 
     ReadersWritersClass(int r, int w) {
+        this.mutex = new Mutex();
+        this.writerCanEnter = new AutoResetEvent(false);
+        this.readerCanEnter = new AutoResetEvent(true);
+
         ThreadStart readerTS = delegate {
             Spawners.ReaderSpawner(r);
         };

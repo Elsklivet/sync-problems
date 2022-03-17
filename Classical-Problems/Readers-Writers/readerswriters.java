@@ -22,15 +22,19 @@ public class readerswriters {
 
         public void run() {
             System.err.printf("Reader %d arrives\n",id);
-                while (writersInside > 0) {
-                    try {
-                        System.err.printf("Reader %d waits to enter\n",id);
-                        synchronized(readerCanEnter){readerCanEnter.wait(2000L,0);}
-                    } catch (InterruptedException iex) {
-                        System.err.printf("Reader %d interrupted in wait call\nStacktrace:",id);
-                        iex.printStackTrace();
-                    }
+            lock.lock();
+            while (writersInside > 0) {
+                lock.unlock();
+                try {
+                    System.err.printf("Reader %d waits to enter\n",id);
+                    synchronized(readerCanEnter){readerCanEnter.wait(2000L,0);}
+                } catch (InterruptedException iex) {
+                    System.err.printf("Reader %d interrupted in wait call\nStacktrace:",id);
+                    iex.printStackTrace();
                 }
+                lock.lock();
+            }
+            lock.unlock();
             synchronized (lock) { 
                 System.err.printf("Reader %d enters the room\n",id);
                 readersInside++;
@@ -61,16 +65,19 @@ public class readerswriters {
         
         public void run() {
             System.err.printf("Writer %d arrives\n",id);
-
-                while ( writersInside > 0 || readersInside > 0 ) {
-                    try {
-                        System.err.printf("Writer %d waits to enter\n",id);
-                        synchronized(writerCanEnter){writerCanEnter.wait(2000L,0);}
-                    } catch (InterruptedException iex) {
-                        System.err.printf("Writer %d interrupted in wait call\nStacktrace:",id);
-                        iex.printStackTrace();
-                    }
+            lock.lock();
+            while ( writersInside > 0 || readersInside > 0 ) {
+                lock.unlock();
+                try {
+                    System.err.printf("Writer %d waits to enter\n",id);
+                    synchronized(writerCanEnter){writerCanEnter.wait(2000L,0);}
+                } catch (InterruptedException iex) {
+                    System.err.printf("Writer %d interrupted in wait call\nStacktrace:",id);
+                    iex.printStackTrace();
+                }
+                lock.lock();
             }
+            lock.unlock();
             synchronized (lock){
                 System.err.printf("Writer %d enters the room\n",id);
                 writersInside++;
